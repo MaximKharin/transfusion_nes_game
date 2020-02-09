@@ -56,5 +56,5 @@ void All_On (void);
 void Reset_Scroll (void);
 void Load_Palette (void);
 void update_Sprites (void);
-void move_logic (void);
-
+void move_logic (unsigned char left_volume, unsigned char right_volume);
+void play_level(unsigned char level_number, unsigned char left_volume, unsigned char right_volume, unsigned char  goal);
