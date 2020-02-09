@@ -30,6 +30,7 @@
 	.export		_Reset_Scroll
 	.export		_Load_Palette
 	.export		_move_logic
+	.export		_play_level
 	.import		_Get_Input
 	.export		_left
 	.export		_right
@@ -37,10 +38,11 @@
 	.export		_MAX_LEFT
 	.export		_MAX_RIGHT
 	.export		_TO_WIN
-	.export		_WIN_TEXT
+	.export		_LEVEL_NUMBER
+	.export		_WIN_LEVEL_TEXT
 	.export		_int_to_char
 	.export		_show_text
-	.export		_show_win
+	.export		_show_win_level
 	.export		_main
 
 .segment	"DATA"
@@ -65,8 +67,10 @@ _MAX_RIGHT:
 	.byte	$03
 _TO_WIN:
 	.byte	$04
-_WIN_TEXT:
-	.byte	$59,$4F,$55,$20,$57,$4F,$4E,$21,$00
+_LEVEL_NUMBER:
+	.byte	$01
+_WIN_LEVEL_TEXT:
+	.byte	$4C,$45,$56,$45,$4C,$20,$50,$41,$53,$53,$45,$44,$21,$00
 
 .segment	"BSS"
 
@@ -210,9 +214,9 @@ _SPRITES:
 ; for( index = 0; index < sizeof(PALETTE); ++index ){
 ;
 	sta     _index
-L00CC:	lda     _index
+L00D5:	lda     _index
 	cmp     #$04
-	bcs     L007C
+	bcs     L0085
 ;
 ; PPU_DATA = PALETTE[index];
 ;
@@ -223,16 +227,16 @@ L00CC:	lda     _index
 ; for( index = 0; index < sizeof(PALETTE); ++index ){
 ;
 	inc     _index
-	jmp     L00CC
+	jmp     L00D5
 ;
 ; }
 ;
-L007C:	rts
+L0085:	rts
 
 .endproc
 
 ; ---------------------------------------------------------------
-; void __near__ move_logic (void)
+; void __near__ move_logic (unsigned char, unsigned char)
 ; ---------------------------------------------------------------
 
 .segment	"CODE"
@@ -242,15 +246,20 @@ L007C:	rts
 .segment	"CODE"
 
 ;
+; void move_logic (unsigned char left_volume, unsigned char right_volume) {
+;
+	jsr     pusha
+;
 ; if ((joypad1 & RIGHT) != 0){
 ;
 	lda     _joypad1
 	and     #$01
-	beq     L00CE
+	beq     L00D7
 ;
-; to_move = MAX_RIGHT - right;
+; to_move = right_volume - right;
 ;
-	lda     _MAX_RIGHT
+	ldy     #$00
+	lda     (sp),y
 	sec
 	sbc     _right
 	sta     _to_move
@@ -260,8 +269,8 @@ L007C:	rts
 	lda     _left
 	sec
 	sbc     _to_move
-	bcc     L00CD
-	beq     L00CD
+	bcc     L00D6
+	beq     L00D6
 ;
 ; left -= to_move;
 ;
@@ -280,29 +289,29 @@ L007C:	rts
 ;
 ; } else {
 ;
-	jmp     L00CE
+	jmp     L00D7
 ;
 ; right += left;
 ;
-L00CD:	lda     _left
+L00D6:	lda     _left
 	clc
 	adc     _right
 	sta     _right
 ;
 ; left = 0;
 ;
-	lda     #$00
-	sta     _left
+	sty     _left
 ;
 ; if ((joypad1 & LEFT) != 0){
 ;
-L00CE:	lda     _joypad1
+L00D7:	lda     _joypad1
 	and     #$02
-	beq     L00D0
+	beq     L00D9
 ;
-; to_move = MAX_LEFT - left;
+; to_move = left_volume - left;
 ;
-	lda     _MAX_LEFT
+	ldy     #$01
+	lda     (sp),y
 	sec
 	sbc     _left
 	sta     _to_move
@@ -312,8 +321,8 @@ L00CE:	lda     _joypad1
 	lda     _right
 	sec
 	sbc     _to_move
-	bcc     L00CF
-	beq     L00CF
+	bcc     L00D8
+	beq     L00D8
 ;
 ; right -= to_move;
 ;
@@ -332,11 +341,11 @@ L00CE:	lda     _joypad1
 ;
 ; } else {
 ;
-	jmp     L00D0
+	jmp     L00D9
 ;
 ; left += right;
 ;
-L00CF:	lda     _right
+L00D8:	lda     _right
 	clc
 	adc     _left
 	sta     _left
@@ -348,26 +357,27 @@ L00CF:	lda     _right
 ;
 ; if ((joypad1 & B_BUTTON) != 0){
 ;
-L00D0:	lda     _joypad1
+L00D9:	lda     _joypad1
 	and     #$40
-	beq     L00D2
+	beq     L00DB
 ;
 ; if ((joypad1 & DOWN) != 0){
 ;
 	lda     _joypad1
 	and     #$04
-	beq     L00D1
+	beq     L00DA
 ;
-; left = MAX_LEFT;
+; left = left_volume;
 ;
-	lda     _MAX_LEFT
+	ldy     #$01
+	lda     (sp),y
 	sta     _left
 ;
 ; if ((joypad1 & UP) != 0){
 ;
-L00D1:	lda     _joypad1
+L00DA:	lda     _joypad1
 	and     #$08
-	beq     L00D2
+	beq     L00DB
 ;
 ; left = 0;
 ;
@@ -376,26 +386,27 @@ L00D1:	lda     _joypad1
 ;
 ; if ((joypad1 & A_BUTTON) != 0){
 ;
-L00D2:	lda     _joypad1
+L00DB:	lda     _joypad1
 	and     #$80
-	beq     L00C6
+	beq     L00CF
 ;
 ; if ((joypad1 & DOWN) != 0){
 ;
 	lda     _joypad1
 	and     #$04
-	beq     L00D3
+	beq     L00DC
 ;
-; right = MAX_RIGHT;
+; right = right_volume;
 ;
-	lda     _MAX_RIGHT
+	ldy     #$00
+	lda     (sp),y
 	sta     _right
 ;
 ; if ((joypad1 & UP) != 0){
 ;
-L00D3:	lda     _joypad1
+L00DC:	lda     _joypad1
 	and     #$08
-	beq     L00C6
+	beq     L00CF
 ;
 ; right = 0;
 ;
@@ -404,7 +415,58 @@ L00D3:	lda     _joypad1
 ;
 ; }
 ;
-L00C6:	rts
+L00CF:	jmp     incsp2
+
+.endproc
+
+; ---------------------------------------------------------------
+; void __near__ play_level (unsigned char, unsigned char, unsigned char, unsigned char)
+; ---------------------------------------------------------------
+
+.segment	"CODE"
+
+.proc	_play_level: near
+
+.segment	"CODE"
+
+;
+; void play_level(unsigned char level_number, unsigned char left_volume, unsigned char right_volume, unsigned char  goal){
+;
+	jsr     pusha
+;
+; Get_Input();
+;
+	jsr     _Get_Input
+;
+; move_logic(left_volume, right_volume);
+;
+	ldy     #$02
+	lda     (sp),y
+	jsr     pusha
+	ldy     #$02
+	lda     (sp),y
+	jsr     _move_logic
+;
+; show_text();
+;
+	jsr     _show_text
+;
+; if ((left == goal)||(right == goal)){
+;
+	ldy     #$00
+	lda     (sp),y
+	cmp     _left
+	beq     L00DF
+	cmp     _right
+	jne     incsp4
+;
+; show_win_level();
+;
+L00DF:	jsr     _show_win_level
+;
+; }
+;
+	jmp     incsp4
 
 .endproc
 
@@ -477,9 +539,9 @@ L00C6:	rts
 	lda     #$21
 	sta     $2006
 ;
-; PPU_ADDRESS = 0x54;   // about the middle of the screen
+; PPU_ADDRESS = 0x53;   // about the middle of the screen
 ;
-	lda     #$54
+	lda     #$53
 	sta     $2006
 ;
 ; PPU_DATA = int_to_char(right); 
@@ -499,12 +561,12 @@ L00C6:	rts
 .endproc
 
 ; ---------------------------------------------------------------
-; void __near__ show_win (void)
+; void __near__ show_win_level (void)
 ; ---------------------------------------------------------------
 
 .segment	"CODE"
 
-.proc	_show_win: near
+.proc	_show_win_level: near
 
 .segment	"CODE"
 
@@ -522,33 +584,33 @@ L00C6:	rts
 	lda     #$21
 	sta     $2006
 ;
-; PPU_ADDRESS = 0xcc;   // about the middle of the screen
+; PPU_ADDRESS = 0xc9;   // about the middle of the screen
 ;
-	lda     #$CC
+	lda     #$C9
 	sta     $2006
 ;
-; for( index = 0; index < sizeof(WIN_TEXT); ++index ){
+; for( index = 0; index < sizeof(WIN_LEVEL_TEXT); ++index ){
 ;
 	lda     #$00
 	sta     _index
-L00D4:	lda     _index
-	cmp     #$09
-	bcs     L0035
+L00E0:	lda     _index
+	cmp     #$0E
+	bcs     L0036
 ;
-; PPU_DATA = WIN_TEXT[index];
+; PPU_DATA = WIN_LEVEL_TEXT[index];
 ;
 	ldy     _index
-	lda     _WIN_TEXT,y
+	lda     _WIN_LEVEL_TEXT,y
 	sta     $2007
 ;
-; for( index = 0; index < sizeof(WIN_TEXT); ++index ){
+; for( index = 0; index < sizeof(WIN_LEVEL_TEXT); ++index ){
 ;
 	inc     _index
-	jmp     L00D4
+	jmp     L00E0
 ;
 ; Reset_Scroll();
 ;
-L0035:	jsr     _Reset_Scroll
+L0036:	jsr     _Reset_Scroll
 ;
 ; All_On();
 ;
@@ -573,41 +635,32 @@ L0035:	jsr     _Reset_Scroll
 ;
 ; while (NMI_flag == 0); // wait till NMI
 ;
-L00D7:	lda     _NMI_flag
-	beq     L00D7
+L00E1:	lda     _NMI_flag
+	beq     L00E1
 ;
-; Get_Input();
+; play_level(LEVEL_NUMBER, MAX_LEFT, MAX_RIGHT, TO_WIN);
 ;
-	jsr     _Get_Input
-;
-; move_logic();
-;
-	jsr     _move_logic
-;
-; show_text();
-;
-	jsr     _show_text
-;
-; if ((left == TO_WIN)||(right == TO_WIN)){
-;
+	jsr     decsp3
+	lda     _LEVEL_NUMBER
+	ldy     #$02
+	sta     (sp),y
+	lda     _MAX_LEFT
+	dey
+	sta     (sp),y
+	lda     _MAX_RIGHT
+	dey
+	sta     (sp),y
 	lda     _TO_WIN
-	cmp     _left
-	beq     L00D8
-	cmp     _right
-	bne     L00DB
-;
-; show_win();
-;
-L00D8:	jsr     _show_win
+	jsr     _play_level
 ;
 ; NMI_flag = 0;
 ;
-L00DB:	lda     #$00
+	lda     #$00
 	sta     _NMI_flag
 ;
 ; while (1){   // infinite loop
 ;
-	jmp     L00D7
+	jmp     L00E1
 
 .endproc
 
