@@ -16,12 +16,14 @@ const unsigned char MAX_RIGHT = 3;
 const unsigned char TO_WIN = 4;
 const unsigned char LEVEL_NUMBER = 1;
 const unsigned char WIN_LEVEL_TEXT[]={"LEVEL PASSED!"};
+const unsigned char LEVEL_NUMBER_TEXT[]={"LEVEL:"};
+const unsigned char GOAL_TEXT[]={"GOAL:"};
 	
 char int_to_char(char i) {
 	return i + '0';
 }	
 
-void show_text(void) {
+void show_text(unsigned char level_number, unsigned char goal) {
 	//	turn off the screen
 	All_Off();
 	
@@ -30,17 +32,42 @@ void show_text(void) {
 
 	//load the text
 	PPU_ADDRESS = 0x21;  	//	set an address in the PPU of 0x21ca
-	PPU_ADDRESS = 0x4b;  	//	about the middle of the screen
+	PPU_ADDRESS = 0x6b;  	//	about the middle of the screen
 	PPU_DATA = int_to_char(left);
 	PPU_ADDRESS = 0x21;  	//	set an address in the PPU of 0x21ca
-	PPU_ADDRESS = 0x53;  	//	about the middle of the screen
+	PPU_ADDRESS = 0x73;  	//	about the middle of the screen
 	PPU_DATA = int_to_char(right);	
+
+	if (level_number > 0) {
+		show_level_and_goal(level_number, goal);
+	}
 
 	//	reset the scroll position	
 	Reset_Scroll();
 	
 	//	turn on screen
 	All_On();
+}
+
+void show_level_and_goal (unsigned char level_number, unsigned char goal){
+	//load the text
+	PPU_ADDRESS = 0x21;  	//	set an address in the PPU of 0x21ca
+	PPU_ADDRESS = 0x01;  	//	left up corner
+	for( index = 0; index < sizeof(LEVEL_NUMBER_TEXT); ++index ){
+		PPU_DATA = LEVEL_NUMBER_TEXT[index];
+	}
+	PPU_ADDRESS = 0x21;  	//	set an address in the PPU of 0x21ca
+	PPU_ADDRESS = 0x07;  	//	left up corner
+	PPU_DATA = int_to_char(level_number);	
+
+	PPU_ADDRESS = 0x21;  	//	set an address in the PPU of 0x21ca
+	PPU_ADDRESS = 0x19;  	//	right up corner
+	for( index = 0; index < sizeof(GOAL_TEXT); ++index ){
+		PPU_DATA = GOAL_TEXT[index];
+	}
+	PPU_ADDRESS = 0x21;  	//	set an address in the PPU of 0x21ca
+	PPU_ADDRESS = 0x1e;  	//	right up corner
+	PPU_DATA = int_to_char(goal);	
 }
 
 void show_win_level(void) {
@@ -68,7 +95,7 @@ void play_level(unsigned char level_number, unsigned char left_volume, unsigned 
 	//every_frame();	// moved this to the nmi code in reset.s for greater stability
 	Get_Input();
 	move_logic(left_volume, right_volume);
-	show_text();
+	show_text(level_number, goal);
 
 	if ((left == goal)||(right == goal)){
 		show_win_level();
@@ -77,7 +104,7 @@ void play_level(unsigned char level_number, unsigned char left_volume, unsigned 
 }
 
 void main (void) {
-	show_text();
+	show_text(0, 0);
 	while (1){ 		// infinite loop
 		while (NMI_flag == 0); // wait till NMI
 		
