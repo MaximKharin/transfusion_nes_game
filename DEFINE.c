@@ -58,3 +58,5 @@ void Load_Palette (void);
 void update_Sprites (void);
 void move_logic (unsigned char left_volume, unsigned char right_volume);
 void play_level(unsigned char level_number, unsigned char left_volume, unsigned char right_volume, unsigned char  goal);
+void show_level_and_goal (unsigned char level_number, unsigned char goal);
+void show_text(unsigned char level_number, unsigned char goal);
