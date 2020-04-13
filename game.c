@@ -10,14 +10,21 @@ void Get_Input (void);
 unsigned char left = 0;
 unsigned char right = 0;
 unsigned char to_move = 0;
+unsigned char level_number = 0;
+unsigned char max_left = 0;
+unsigned char max_right = 0;
+unsigned char to_win = 0;
 
-const unsigned char MAX_LEFT = 5;
-const unsigned char MAX_RIGHT = 3;
-const unsigned char TO_WIN = 4;
-const unsigned char LEVEL_NUMBER = 1;
 const unsigned char WIN_LEVEL_TEXT[]={"LEVEL PASSED!"};
 const unsigned char LEVEL_NUMBER_TEXT[]={"LEVEL:"};
 const unsigned char GOAL_TEXT[]={"GOAL:"};
+const unsigned char LEVELS[] = {1, 5, 3, 4, 
+								2, 7, 5, 6,
+								3, 7, 4, 2};
+const unsigned char LEVEL_COUNT = 3;
+
+unsigned char cycle = 0;
+unsigned char status = 0;
 	
 char int_to_char(char i) {
 	return i + '0';
@@ -91,26 +98,74 @@ void show_win_level(void) {
 	All_On();
 }
 
-void play_level(unsigned char level_number, unsigned char left_volume, unsigned char right_volume, unsigned char  goal){
-	//every_frame();	// moved this to the nmi code in reset.s for greater stability
+void clear_screen(void) {
+	//	turn off the screen
+	All_Off();
+	
+	//load the text
+	PPU_ADDRESS = 0x21;  	//	set an address in the PPU of 0x21ca
+	PPU_ADDRESS = 0x00;  	//	about the middle of the screen
+	for( index = 0; index < 255; ++index ){
+		PPU_DATA = 0;
+	}
+				
+	//	reset the scroll position	
+	Reset_Scroll();
+	
+	//	turn on screen
+	All_On();
+}
+
+unsigned char wait_start_button(){
 	Get_Input();
-	move_logic(left_volume, right_volume);
-	show_text(level_number, goal);
+	if ((joypad1 & START)!= 0){
+		return 1;
+	}
+	return 0;
+}
+
+unsigned char play_level(unsigned char level_number, unsigned char left_volume, unsigned char right_volume, unsigned char  goal){
+	//every_frame();	// moved this to the nmi code in reset.s for greater stability
+	unsigned char s = 0;
+	while (NMI_flag == 0); // wait till NMI
+	Get_Input();
+	s = move_logic(left_volume, right_volume);
+	if (s > 0){
+		show_text(level_number, goal);
+		s = 0;
+	}
+	NMI_flag = 0;
 
 	if ((left == goal)||(right == goal)){
 		show_win_level();
+		while (s == 0){
+			s = wait_start_button();
+		}
+		return 1;
 	}
-
+	return 0;
 }
+
 
 void main (void) {
 	show_text(0, 0);
+
 	while (1){ 		// infinite loop
-		while (NMI_flag == 0); // wait till NMI
-		
-		play_level(LEVEL_NUMBER, MAX_LEFT, MAX_RIGHT, TO_WIN);
-		
-		NMI_flag = 0;
+		for (cycle = 0; cycle < LEVEL_COUNT; cycle++) {
+			left = 0;
+			right = 0;
+			level_number = LEVELS[cycle*4+0];
+			max_left = LEVELS[cycle*4+1];
+			max_right = LEVELS[cycle*4+2];
+			to_win = LEVELS[cycle*4+3];
+			status = 0;
+			show_text(level_number, to_win);
+			while (status == 0){
+				status = play_level(level_number, max_left, max_right, to_win);
+			}
+			clear_screen();
+		}
+		break;
 	}
 }
 	
@@ -147,7 +202,7 @@ void Load_Palette (void) {
 }
 
 
-void move_logic (unsigned char left_volume, unsigned char right_volume) {
+unsigned char move_logic (unsigned char left_volume, unsigned char right_volume) {
 	if ((joypad1 & RIGHT) != 0){
 		to_move = right_volume - right;
 		if (left > to_move){
@@ -157,6 +212,7 @@ void move_logic (unsigned char left_volume, unsigned char right_volume) {
 			right += left;
 			left = 0;
 		}
+		return 1;
 	}
 	if ((joypad1 & LEFT) != 0){
 		to_move = left_volume - left;
@@ -167,23 +223,29 @@ void move_logic (unsigned char left_volume, unsigned char right_volume) {
 			left += right;
 			right = 0;
 		}
+		return 1;
 	}
 	if ((joypad1 & B_BUTTON) != 0){
 		if ((joypad1 & DOWN) != 0){
 			left = left_volume;
+			return 1;
 		}
 		if ((joypad1 & UP) != 0){
 			left = 0;
+			return 1;
 		}
 	}
 	if ((joypad1 & A_BUTTON) != 0){
 		if ((joypad1 & DOWN) != 0){
 			right = right_volume;
+			return 1;
 		}
 		if ((joypad1 & UP) != 0){
 			right = 0;
+			return 1;
 		}
 	}
+	return 0;
 }
 
 
